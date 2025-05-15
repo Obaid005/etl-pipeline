@@ -82,3 +82,93 @@ Check out a few resources that may come in handy when working with NestJS:
 - Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
 - To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
 - Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+
+# ETL Pipeline with NestJS
+
+A real-time ETL (Extract, Transform, Load) pipeline implementation using NestJS, MongoDB, RabbitMQ, and SQLite.
+
+## Architecture
+
+The pipeline consists of five main components:
+
+1. **MongoDB** as the source database
+2. **Change Data Capture (CDC)** using MongoDB Change Streams to detect changes
+3. **RabbitMQ** as the message queue for decoupling producers and consumers
+4. **Spark Module** (simulated) for data processing and transformation
+5. **SQLite** as the data warehouse for storing processed data
+
+## Flow
+
+1. The CDC service listens to changes in MongoDB collections (Orders, Devices, User Activities)
+2. When changes are detected, they are published to RabbitMQ
+3. The Spark service consumes messages from RabbitMQ, processes them in batches
+4. Transformed data is stored in SQLite database for analytics
+
+## Setup
+
+### Prerequisites
+
+- Node.js (v18+)
+- MongoDB
+- RabbitMQ
+
+### Installation
+
+```bash
+npm install
+```
+
+### Configuration
+
+Edit the configuration in `src/config/configuration.ts` to match your environment:
+
+```typescript
+export default () => ({
+  mongo: {
+    uri: process.env.MONGO_URI || 'mongodb://localhost:27017/etl-pipeline',
+  },
+  rabbitmq: {
+    uri: process.env.RABBITMQ_URI || 'amqp://localhost:5672',
+    queue: process.env.RABBITMQ_QUEUE || 'cdc_events',
+  },
+  sqlite: {
+    database: process.env.SQLITE_DATABASE || './data/warehouse.db',
+    tables: {
+      orders: process.env.SQLITE_ORDERS_TABLE || 'orders',
+      devices: process.env.SQLITE_DEVICES_TABLE || 'devices',
+      userActivities: process.env.SQLITE_USER_ACTIVITIES_TABLE || 'user_activities',
+    },
+  },
+});
+```
+
+### Running the application
+
+```bash
+npm run start:dev
+```
+
+## Database Schemas
+
+### MongoDB
+
+The MongoDB database contains the following collections:
+- Orders
+- Devices
+- User Activities
+
+### SQLite Warehouse
+
+The SQLite database contains corresponding tables with transformed and enriched data.
+
+## Data Transformation
+
+The Spark service (simulated in this implementation) applies the following transformations:
+
+1. **Orders**: Calculates tax, subtotal, and total amount
+2. **Devices**: Categorizes devices, calculates days since registration
+3. **User Activities**: Enriches with time of day, weekday, and geographic information
+
+## License
+
+MIT
