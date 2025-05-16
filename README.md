@@ -319,7 +319,6 @@ curl http://localhost:3000/health
 
 - [DEPLOYMENT.md](DEPLOYMENT.md): Detailed production deployment guide
 - [MONGODB-SETUP.md](MONGODB-SETUP.md): MongoDB replica set configuration
-- [REASONING.md](REASONING.md): In-depth technical rationale for design choices
 - [Architecture Diagram](docs/architecture.html): Interactive visualization of the system architecture (open in browser or run `./scripts/view-architecture.sh`)
 
 ## License
