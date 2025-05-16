@@ -1,0 +1,27 @@
+version: '3.8'
+
+# Override file for development environment
+services:
+  app:
+    build:
+      target: builder # Use the builder stage instead of the production stage
+    volumes:
+      - .:/app # Mount project directory for hot reloading
+      - /app/node_modules # Don't overwrite node_modules
+    command: npm run start:dev # Run with hot reloading
+    environment:
+      - NODE_ENV=development
+    # Add any development-specific environment variables here
+    
+  # You can override any service settings for development
+  mongodb-primary:
+    ports:
+      - "27017:27017" # Make MongoDB accessible from the host
+    
+  mongodb-secondary-1:
+    ports:
+      - "27018:27017" # Make MongoDB secondary accessible from the host
+      
+  mongodb-secondary-2:
+    ports:
+      - "27019:27017" # Make MongoDB secondary accessible from the host 

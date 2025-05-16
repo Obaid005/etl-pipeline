@@ -507,4 +507,19 @@ export class WarehouseService implements OnModuleInit {
       return [];
     }
   }
+
+  /**
+   * Check if the warehouse connection is active
+   * @returns boolean indicating if the connection is active
+   */
+  isConnected(): boolean {
+    try {
+      // Simple check to see if we can run a query
+      const result = this.db.prepare('SELECT 1').get();
+      return !!result;
+    } catch (error) {
+      this.logger.error('Error checking warehouse connection:', error);
+      return false;
+    }
+  }
 }

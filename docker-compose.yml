@@ -1,47 +1,78 @@
 version: '3.8'
 
 services:
-  mongodb:
+  # MongoDB Replica Set
+  mongodb-primary:
     image: mongo:latest
-    platform: linux/arm64
-    container_name: mongodb
+    container_name: mongodb-primary
+    restart: always
     ports:
       - "27017:27017"
     volumes:
-      - mongodb_data:/data/db
+      - mongodb_data_primary:/data/db
     command: ["--replSet", "rs0", "--bind_ip_all"]
-    hostname: mongodb
-    restart: always
     environment:
       - MONGO_INITDB_DATABASE=etl-pipeline
+    healthcheck:
+      test: mongosh --eval 'db.adminCommand("ping")' || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - etl-network
 
+  mongodb-secondary-1:
+    image: mongo:latest
+    container_name: mongodb-secondary-1
+    restart: always
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongodb_data_secondary_1:/data/db
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    depends_on:
+      - mongodb-primary
+    networks:
+      - etl-network
+
+  mongodb-secondary-2:
+    image: mongo:latest
+    container_name: mongodb-secondary-2
+    restart: always
+    ports:
+      - "27019:27017"
+    volumes:
+      - mongodb_data_secondary_2:/data/db
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    depends_on:
+      - mongodb-primary
+    networks:
+      - etl-network
+
+  # MongoDB Initialization
   mongo-init:
     image: mongo:latest
-    platform: linux/arm64
     restart: "no"
     depends_on:
-      - mongodb
-    command: >
-      bash -c "
-      sleep 10 &&
-      mongosh --host mongodb:27017 --eval '
-        rs.initiate({
-          _id: \"rs0\", 
-          members: [{ _id: 0, host: \"mongodb:27017\", priority: 1 }]
-        });
-      ' &&
-      sleep 5 &&
-      mongosh --host mongodb:27017 --eval '
-        db = db.getSiblingDB(\"etl-pipeline\");
-        db.createCollection(\"orders\");
-        db.createCollection(\"devices\");
-        db.createCollection(\"useractivities\");
-      '
-      "
+      mongodb-primary:
+        condition: service_healthy
+    volumes:
+      - ./scripts/mongo-init.sh:/mongo-init.sh
+      - mongo_init_data:/tmp
+    command: ["/bin/bash", "/mongo-init.sh"]
+    healthcheck:
+      test: test -f /tmp/mongo_initialized || exit 1
+      interval: 2s
+      timeout: 1s
+      retries: 3
+      start_period: 1s
+    networks:
+      - etl-network
 
+  # RabbitMQ Service
   rabbitmq:
     image: rabbitmq:3-management
-    platform: linux/arm64
     container_name: rabbitmq
     ports:
       - "5672:5672"    # AMQP port
@@ -51,7 +82,32 @@ services:
       - RABBITMQ_DEFAULT_PASS=guest
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - etl-network
 
+  # Redis Service (for caching/pub-sub if needed)
+  redis:
+    image: redis:alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: redis-cli ping || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - etl-network
+
+  # ETL Application
   app:
     build:
       context: .
@@ -60,15 +116,35 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - MONGO_URI=mongodb://mongodb:27017/etl-pipeline?replicaSet=rs0
+      - MONGO_URI=mongodb://mongodb-primary:27017,mongodb-secondary-1:27017,mongodb-secondary-2:27017/etl-pipeline?replicaSet=rs0
       - RABBITMQ_URI=amqp://guest:guest@rabbitmq:5672
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - NODE_ENV=production
+      - PORT=3000
     volumes:
       - ./data:/app/data
     depends_on:
-      - mongodb
-      - rabbitmq
+      mongodb-primary:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mongo-init:
+        condition: service_completed_successfully
     restart: on-failure
+    networks:
+      - etl-network
 
 volumes:
-  mongodb_data:
-  rabbitmq_data: 
+  mongodb_data_primary:
+  mongodb_data_secondary_1:
+  mongodb_data_secondary_2:
+  rabbitmq_data:
+  redis_data:
+  mongo_init_data:
+
+networks:
+  etl-network:
+    driver: bridge 

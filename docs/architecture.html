@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ETL Pipeline Architecture</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .architecture {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            margin: 30px 0;
+        }
+        .component {
+            width: 300px;
+            padding: 15px;
+            border-radius: 8px;
+            color: white;
+            text-align: center;
+            position: relative;
+        }
+        .arrow {
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            position: relative;
+        }
+        .arrow::before {
+            content: "";
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 10px solid #666;
+            bottom: 0;
+        }
+        .data-label {
+            position: absolute;
+            right: -140px;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: #f0f0f0;
+            padding: 5px;
+            border-radius: 4px;
+            color: #333;
+            font-size: 0.8rem;
+        }
+        .mongodb { background-color: #4DB33D; }
+        .cdc { background-color: #F16529; }
+        .rabbitmq { background-color: #FF6600; }
+        .spark { background-color: #E25A1C; }
+        .sqlite { background-color: #0078D7; }
+        
+        .description {
+            margin-top: 30px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ETL Pipeline Architecture</h1>
+        
+        <div class="architecture">
+            <div class="component mongodb">
+                <h3>MongoDB</h3>
+                <p>Source Database</p>
+            </div>
+            
+            <div class="arrow">
+                <div class="data-label">Change Events</div>
+            </div>
+            
+            <div class="component cdc">
+                <h3>Change Data Capture</h3>
+                <p>Using MongoDB Change Streams</p>
+            </div>
+            
+            <div class="arrow">
+                <div class="data-label">CDC Events</div>
+            </div>
+            
+            <div class="component rabbitmq">
+                <h3>RabbitMQ</h3>
+                <p>Message Queue</p>
+            </div>
+            
+            <div class="arrow">
+                <div class="data-label">Batched Messages</div>
+            </div>
+            
+            <div class="component spark">
+                <h3>Spark Module</h3>
+                <p>Data Transformation</p>
+            </div>
+            
+            <div class="arrow">
+                <div class="data-label">Transformed Data</div>
+            </div>
+            
+            <div class="component sqlite">
+                <h3>SQLite</h3>
+                <p>Data Warehouse</p>
+            </div>
+        </div>
+        
+        <div class="description">
+            <h2>Architecture Description</h2>
+            <p>This ETL (Extract, Transform, Load) pipeline uses a modern event-driven architecture to process data in real-time.</p>
+            
+            <ol>
+                <li><strong>MongoDB (Extract):</strong> The source database where application data is stored. When documents are created, updated, or deleted, these changes trigger the ETL process.</li>
+                
+                <li><strong>Change Data Capture:</strong> A service that detects changes in MongoDB using Change Streams (with a polling fallback mechanism). When changes are detected, they are packaged as events and sent to the message queue.</li>
+                
+                <li><strong>RabbitMQ (Message Queue):</strong> Decouples the CDC service from the transformation process, providing buffering and ensuring reliable delivery of change events.</li>
+                
+                <li><strong>Spark Module (Transform):</strong> A simulated Spark-like service that processes data in batches, applying business rules and transformations to prepare the data for analytics.</li>
+                
+                <li><strong>SQLite (Load):</strong> The data warehouse where transformed data is stored in a format optimized for analytics and reporting.</li>
+            </ol>
+            
+            <p><strong>Key Features:</strong></p>
+            <ul>
+                <li>Real-time change detection with fallback mechanisms</li>
+                <li>Reliable message delivery with retry support</li>
+                <li>Batch processing for efficiency</li>
+                <li>Modular design for extensibility</li>
+                <li>Suitable for development and demonstration purposes</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html> 

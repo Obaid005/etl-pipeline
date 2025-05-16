@@ -1,0 +1,43 @@
+             +---------------------+
+             |                     |
+             |     MongoDB         |
+             |                     |
+             +---------+-----------+
+                       |
+                       | Changes
+                       v
+             +---------+-----------+
+             |                     |
+             |  Change Data        |
+             |  Capture Service    |
+             |                     |
+             +---------+-----------+
+                       |
+                       | Events
+                       v
+             +---------+-----------+
+             |                     |
+             |     RabbitMQ        |
+             |                     |
+             +---------+-----------+
+                       |
+                       | Messages
+                       v
+             +---------+-----------+
+             |                     |
+             |    Spark Module     |
+             |  (Transformation)   |
+             |                     |
+             +---------+-----------+
+                       |
+                       | Transformed Data
+                       v
+             +---------+-----------+
+             |                     |
+             |      SQLite         |
+             |   Data Warehouse    |
+             |                     |
+             +---------------------+
+
+Note: This is a text-based placeholder for the ETL architecture diagram.
+Please replace with a proper image diagram in PNG or SVG format. 

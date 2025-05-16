@@ -87,7 +87,61 @@ Check out a few resources that may come in handy when working with NestJS:
 
 A real-time ETL (Extract, Transform, Load) pipeline implementation using NestJS, MongoDB, RabbitMQ, and SQLite.
 
-## Architecture
+## Table of Contents
+
+- [Architecture Overview](#architecture-overview)
+- [Setup Instructions](#setup-instructions)
+- [Design Rationale](#design-rationale)
+- [Trade-offs and Limitations](#trade-offs-and-limitations)
+- [Testing the Pipeline](#testing-the-pipeline)
+- [Advanced Documentation](#advanced-documentation)
+
+## Architecture Overview
+
+```
+             +---------------------+
+             |                     |
+             |     MongoDB         |
+             |                     |
+             +---------+-----------+
+                       |
+                       | Changes
+                       v
+             +---------+-----------+
+             |                     |
+             |  Change Data        |
+             |  Capture Service    |
+             |                     |
+             +---------+-----------+
+                       |
+                       | Events
+                       v
+             +---------+-----------+
+             |                     |
+             |     RabbitMQ        |
+             |                     |
+             +---------+-----------+
+                       |
+                       | Messages
+                       v
+             +---------+-----------+
+             |                     |
+             |    Spark Module     |
+             |  (Transformation)   |
+             |                     |
+             +---------+-----------+
+                       |
+                       | Transformed Data
+                       v
+             +---------+-----------+
+             |                     |
+             |      SQLite         |
+             |   Data Warehouse    |
+             |                     |
+             +---------------------+
+```
+
+> **Note:** A more detailed architecture diagram is available in HTML format at [docs/architecture.html](docs/architecture.html). You can view it by running `./scripts/view-architecture.sh` to open it automatically in your browser.
 
 The pipeline consists of five main components:
 
@@ -97,77 +151,176 @@ The pipeline consists of five main components:
 4. **Spark Module** (simulated) for data processing and transformation
 5. **SQLite** as the data warehouse for storing processed data
 
-## Flow
+### Data Flow
 
 1. The CDC service listens to changes in MongoDB collections (Orders, Devices, User Activities)
+   - Uses Change Streams for real-time change detection (requires MongoDB replica set)
+   - Falls back to polling if Change Streams are not available
 2. When changes are detected, they are published to RabbitMQ
 3. The Spark service consumes messages from RabbitMQ, processes them in batches
 4. Transformed data is stored in SQLite database for analytics
 
-## Setup
+## Setup Instructions
 
 ### Prerequisites
 
-- Node.js (v18+)
-- MongoDB
-- RabbitMQ
+- Docker and Docker Compose (recommended)
+- Node.js (v18+) if running locally
+- Git for cloning the repository
 
-### Installation
+### Quick Start with Docker
 
-```bash
-npm install
-```
-
-### Configuration
-
-Edit the configuration in `src/config/configuration.ts` to match your environment:
-
-```typescript
-export default () => ({
-  mongo: {
-    uri: process.env.MONGO_URI || 'mongodb://localhost:27017/etl-pipeline',
-  },
-  rabbitmq: {
-    uri: process.env.RABBITMQ_URI || 'amqp://localhost:5672',
-    queue: process.env.RABBITMQ_QUEUE || 'cdc_events',
-  },
-  sqlite: {
-    database: process.env.SQLITE_DATABASE || './data/warehouse.db',
-    tables: {
-      orders: process.env.SQLITE_ORDERS_TABLE || 'orders',
-      devices: process.env.SQLITE_DEVICES_TABLE || 'devices',
-      userActivities: process.env.SQLITE_USER_ACTIVITIES_TABLE || 'user_activities',
-    },
-  },
-});
-```
-
-### Running the application
+The easiest way to run the entire application stack is using Docker Compose:
 
 ```bash
-npm run start:dev
+# Clone the repository
+git clone https://github.com/your-username/etl-pipeline.git
+cd etl-pipeline
+
+# Start development environment (with hot reload)
+./scripts/docker-deploy.sh dev
+
+# View logs
+./scripts/docker-deploy.sh logs
+
+# Check container status
+./scripts/docker-deploy.sh status
+
+# Stop containers
+./scripts/docker-deploy.sh down
 ```
 
-## Database Schemas
+### Production Deployment
 
-### MongoDB
+For production deployment with an external MongoDB service:
 
-The MongoDB database contains the following collections:
-- Orders
-- Devices
-- User Activities
+```bash
+# Set your MongoDB connection string
+export MONGO_URI='mongodb+srv://username:password@cluster.mongodb.net/etl-pipeline?retryWrites=true&w=majority'
 
-### SQLite Warehouse
+# Start production environment
+./scripts/docker-deploy.sh prod
+```
 
-The SQLite database contains corresponding tables with transformed and enriched data.
+For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
-## Data Transformation
+### Manual Setup
 
-The Spark service (simulated in this implementation) applies the following transformations:
+For setting up MongoDB replica set manually or running the application without Docker, see [MONGODB-SETUP.md](MONGODB-SETUP.md).
 
-1. **Orders**: Calculates tax, subtotal, and total amount
-2. **Devices**: Categorizes devices, calculates days since registration
-3. **User Activities**: Enriches with time of day, weekday, and geographic information
+## Design Rationale
+
+### MongoDB as Source Database
+
+**Why MongoDB:**
+- Flexible document model well-suited for evolving schemas
+- Strong support for real-time change detection
+- Scalable and production-ready
+
+### Change Data Capture with MongoDB Change Streams
+
+**Why Change Streams over alternatives:**
+- **Native Integration**: Built directly into MongoDB with no additional services
+- **Real-time Performance**: Low-latency change notifications via the oplog
+- **Simplicity**: Fewer moving parts compared to Debezium or other CDC tools
+- **Resilience**: Our implementation includes a polling fallback
+
+For a detailed analysis of our CDC approach, see [REASONING.md](REASONING.md#change-data-capture-with-mongodb-change-streams).
+
+### RabbitMQ as Message Broker
+
+**Why RabbitMQ over alternatives:**
+- **Message Routing**: Flexible exchange and queue routing patterns
+- **Operational Simplicity**: Lower infrastructure requirements than Kafka
+- **Reliability**: Supports persistent messages, dead-letter exchanges, and acknowledgments
+- **NestJS Integration**: Well-supported in the NestJS ecosystem
+
+For details on our messaging implementation, see [REASONING.md](REASONING.md#message-processing-with-rabbitmq).
+
+### Spark Module for Processing
+
+**Why a Spark-like module:**
+- **Batch Processing**: Efficient processing of multiple records
+- **Transformation Logic**: Centralized data transformation rules
+- **Extensibility**: Modular approach to adding new transformation logic
+
+Note: This is a simulated Spark module within NestJS, not Apache Spark. In a production environment with higher volumes, Apache Spark would be a natural extension.
+
+### SQLite as Data Warehouse
+
+**Why SQLite over cloud alternatives:**
+- **Simplicity**: No additional infrastructure setup
+- **Development Friendly**: Easy to work with during development
+- **Cost-Effective**: Free alternative to paid cloud data warehouses
+- **Sufficient for Demos**: Adequate for demonstrating the ETL concept
+
+In a production environment, this could be replaced with BigQuery, Redshift, or Snowflake for scalability.
+
+## Trade-offs and Limitations
+
+### Change Data Capture
+
+**Limitations:**
+- **Replica Set Requirement**: MongoDB Change Streams only work with replica sets
+- **Oplog Size Limitations**: Changes older than the oplog retention period are not captured
+- **Reconnection Complexity**: Handling reconnections requires resume tokens
+
+**Mitigations:**
+- Polling fallback mechanism
+- Docker environment includes a pre-configured replica set
+- Resume token persistence for recovery
+
+### Message Processing
+
+**Trade-offs:**
+- **At-least-once Delivery**: Messages may be processed more than once
+- **Ordering Guarantees**: Queue-level ordering but not global ordering
+- **Message Persistence**: Persistent messages have higher latency
+
+**Mitigations:**
+- Deduplication mechanisms
+- Transaction support for critical operations
+- Idempotent message consumers
+
+### Data Warehouse
+
+**Limitations:**
+- **Scalability**: SQLite is single-writer and not suitable for high concurrency
+- **Query Performance**: Limited advanced analytics capabilities
+- **Storage Limits**: Not suitable for large-scale data warehousing
+
+**Considerations for Production:**
+- Replace with a cloud data warehouse for production workloads
+- Implement proper data modeling and partitioning
+- Consider columnar storage formats for analytical queries
+
+## Testing the Pipeline
+
+You can test the pipeline using the following API endpoints:
+
+```bash
+# Create a test order
+curl -X POST http://localhost:3000/test/order -H "Content-Type: application/json" -d '{"customerId":"TEST-CUST-001"}'
+
+# Create a test device
+curl -X POST http://localhost:3000/test/device -H "Content-Type: application/json" -d '{"userId":"TEST-USER-001"}'
+
+# Create a test user activity
+curl -X POST http://localhost:3000/test/activity -H "Content-Type: application/json" -d '{"userId":"TEST-USER-001","type":"login"}'
+
+# Check ETL status
+curl http://localhost:3000/test/status
+
+# Check application health
+curl http://localhost:3000/health
+```
+
+## Advanced Documentation
+
+- [DEPLOYMENT.md](DEPLOYMENT.md): Detailed production deployment guide
+- [MONGODB-SETUP.md](MONGODB-SETUP.md): MongoDB replica set configuration
+- [REASONING.md](REASONING.md): In-depth technical rationale for design choices
+- [Architecture Diagram](docs/architecture.html): Interactive visualization of the system architecture (open in browser or run `./scripts/view-architecture.sh`)
 
 ## License
 

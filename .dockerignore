@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+.github
+
+# Node.js
+node_modules
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+*.log
+logs
+coverage
+.nyc_output
+
+# Build output
+dist
+build
+
+# Docker
+.dockerignore
+Dockerfile
+docker-compose*.yml
+
+# Data
+data
+
+# Editor directories
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db 
